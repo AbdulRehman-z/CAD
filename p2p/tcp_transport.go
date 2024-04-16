@@ -3,7 +3,6 @@ package p2p
 import (
 	"fmt"
 	"net"
-	"sync"
 )
 
 // TCPPeer represents the remote node over the tcp established connection.
@@ -24,26 +23,30 @@ func NewTCPPeer(conn *net.TCPConn, outbound bool) *TCPPeer {
 	}
 }
 
+func (p *TCPPeer) Close() error {
+	return p.conn.Close()
+}
+
 // TCPTransportOpts represents the options for the TCPTransport.
 type TCPTransportOpts struct {
 	ListenAddr  *net.TCPAddr
 	TcpListener *net.TCPListener
 	Handshake   HandshakeFunc
 	Decoder     Decoder
+	OnPeer      func(Peer) error
 }
 
 // TCPTransport represents the transport layer for the TCP protocol.
 type TCPTransport struct {
 	TCPTransportOpts
-
-	mu    sync.RWMutex
-	peers map[*net.TCPAddr]Peer
+	rpcch chan RPC
 }
 
 // NewTCPTransport creates a new TCPTransport instance.
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
+		rpcch:            make(chan RPC),
 	}
 }
 
@@ -62,6 +65,10 @@ func (t *TCPTransport) ListenAndAccept() error {
 	return nil
 }
 
+func (t *TCPTransport) Consume() <-chan RPC {
+	return t.rpcch
+}
+
 func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.TcpListener.AcceptTCP()
@@ -76,22 +83,35 @@ func (t *TCPTransport) startAcceptLoop() {
 
 // handleConn handles the incoming connection.
 func (t *TCPTransport) handleConn(conn *net.TCPConn) {
+	var err error
+
+	defer func() {
+		fmt.Println("terminating connection:", err)
+		conn.Close()
+	}()
 
 	peer := NewTCPPeer(conn, true)
 
-	if err := t.Handshake(peer); err != nil {
+	if err = t.Handshake(peer); err != nil {
 		fmt.Printf("Handshake failed: %v\n", err)
 		return
 	}
 
-	msg := &Message{}
+	if t.OnPeer != nil {
+		if err = t.OnPeer(peer); err != nil {
+			return
+		}
+	}
+
+	msg := RPC{}
 	for {
-		if err := t.Decoder.Decode(conn, msg); err != nil {
-			fmt.Printf("Failed to decode message: %v\n", err)
+		if err = t.Decoder.Decode(conn, &msg); err != nil {
+			fmt.Printf("Failed to decode RPC: %v\n", err)
 			continue
 		}
 
 		msg.From = conn.RemoteAddr()
-		fmt.Printf("Received message: %v %v\n", msg.From.String(), string(msg.Payload))
+		t.rpcch <- msg
+		fmt.Printf("Received RPC: %v %v\n", msg.From.String(), string(msg.Payload))
 	}
 }
