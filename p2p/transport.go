@@ -9,7 +9,7 @@ type Peer interface {
 
 // Transport represents as an interface for a transport layer
 type Transport interface {
-	listenAndAccept() error
+	ListenAndAccept() error
 	Consume() <-chan RPC
 }
 
