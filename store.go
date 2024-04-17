@@ -94,6 +94,10 @@ func (s *Store) Delete(key string) error {
 	return os.RemoveAll(firstPathnameWithRoot)
 }
 
+func (s *Store) Clear() error {
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) Read(key string) (io.Reader, error) {
 	r, err := s.readStream(key)
 	if err != nil {
@@ -110,6 +114,10 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	}
 
 	return buf, nil
+}
+
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeSream(key, r)
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
