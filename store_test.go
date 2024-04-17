@@ -9,12 +9,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStore(t *testing.T) {
+func newStore() *Store {
 	opts := StoreOpts{
 		PathTransformFunc: CasPathTransformFunc,
 	}
 
 	s := NewStore(opts)
+	return s
+}
+
+func teardown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStore(t *testing.T) {
+	s := newStore()
+	defer teardown(t, s)
+
 	data := []byte("hello there")
 	if err := s.writeSream("dir", bytes.NewReader(data)); err != nil {
 		t.Error(err)
@@ -44,23 +57,6 @@ func TestStore(t *testing.T) {
 
 	if s.Has("dir") {
 		t.Error("dir should not exist")
-	}
-
-}
-
-func TestDelete(t *testing.T) {
-	opts := StoreOpts{
-		PathTransformFunc: CasPathTransformFunc,
-	}
-
-	s := NewStore(opts)
-	data := []byte("hello there")
-	if err := s.writeSream("dir", bytes.NewReader(data)); err != nil {
-		t.Error(err)
-	}
-
-	if err := s.Delete("dir"); err != nil {
-		t.Error(err)
 	}
 
 }
