@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"time"
 
 	"github.com/1500-bytes/CAD/p2p"
 	"github.com/1500-bytes/CAD/server"
 	"github.com/1500-bytes/CAD/store"
 )
 
-func main() {
+func initServer(port int, nodes ...int) *server.FileServer {
 	transOpts := p2p.TCPTransportOpts{
 		ListenAddr: &net.TCPAddr{
-			IP:   net.ParseIP("0.0.0.0"),
-			Port: 4000,
+			IP:   net.ParseIP("localhost"),
+			Port: port,
 		},
 		Handshake: p2p.NOPEHandshake,
 		Decoder:   &p2p.DefaultDecoder{},
@@ -28,20 +27,24 @@ func main() {
 		PathTransformFunc: store.CasPathTransformFunc,
 		RootStorage:       "4000_network",
 		Transport:         tcpTransport,
+		BootstrapNodes:    nodes,
 	}
 
 	s := server.NewFileServer(fileServerOpts)
+	return s
 
-	// fmt.Printf("FileServer started with root storage at %s\n", s)
+}
+
+func main() {
+
+	s1 := initServer(4000, []int{}...)
+	s2 := initServer(4001, []int{4000}...)
 
 	go func() {
-		time.Sleep(5 * time.Second)
-		s.Stop()
+		if err := s1.Start(); err != nil {
+			log.Fatalf("Error starting server: %s", err)
+		}
 	}()
 
-	log.Println("Starting server")
-	if err := s.Start(); err != nil {
-		log.Fatalf("Error starting server: %s", err)
-	}
-
+	s2.Start()
 }
