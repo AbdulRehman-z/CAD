@@ -24,6 +24,7 @@ func NewTCPPeer(conn *net.TCPConn, outbound bool) *TCPPeer {
 	}
 }
 
+// Close closes the underlying connection of the TCPPeer.
 func (p *TCPPeer) Close() error {
 	return p.conn.Close()
 }
@@ -74,7 +75,28 @@ func (t *TCPTransport) Close() error {
 	return t.TcpListener.Close()
 }
 
+// Dial dials to the provided addr.
+func (t *TCPTransport) Dial(port int) error {
+	conn, err := net.DialTCP("tcp", t.ListenAddr, &net.TCPAddr{
+		IP:   net.ParseIP("localhost"),
+		Port: port,
+	},
+	)
+
+	fmt.Println("Dialing to: ", port)
+
+	if err != nil {
+		return fmt.Errorf("failed to dial: %v", err)
+	}
+
+	go t.handleConn(conn, true)
+	return nil
+}
+
+// startAcceptLoop starts the accept loop for accepting incoming connections.
 func (t *TCPTransport) startAcceptLoop() {
+	rateLimit := 0
+
 	for {
 		conn, err := t.TcpListener.AcceptTCP()
 
@@ -83,17 +105,26 @@ func (t *TCPTransport) startAcceptLoop() {
 			return
 		}
 
+		if rateLimit > 5 {
+			fmt.Println("Rate limit exceeded")
+			break
+		}
+
+		fmt.Println("Rate limit: ", rateLimit)
+
 		if err != nil {
+			rateLimit++
+			fmt.Println("connetion: ", conn)
 			fmt.Printf("Failed to accept connection: %v\n", err)
 			continue
 		}
 
-		go t.handleConn(conn)
+		go t.handleConn(conn, false)
 	}
 }
 
 // handleConn handles the incoming connection.
-func (t *TCPTransport) handleConn(conn *net.TCPConn) {
+func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 	var err error
 
 	defer func() {
@@ -101,7 +132,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn) {
 		conn.Close()
 	}()
 
-	peer := NewTCPPeer(conn, true)
+	peer := NewTCPPeer(conn, outbound)
 
 	if err = t.Handshake(peer); err != nil {
 		fmt.Printf("Handshake failed: %v\n", err)
