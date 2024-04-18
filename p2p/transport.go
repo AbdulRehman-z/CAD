@@ -12,6 +12,7 @@ type Transport interface {
 	ListenAndAccept() error
 	Consume() <-chan RPC
 	Close() error
+	Dial(int) error
 }
 
 // RPC represents the RPC that is sent between peers.
