@@ -99,6 +99,7 @@ func (s *Store) Clear() error {
 }
 
 func (s *Store) Read(key string) (io.Reader, error) {
+	fmt.Println("Reading key: ", key)
 	r, err := s.readStream(key)
 	if err != nil {
 		fmt.Println("Error in reading stream: ", err)
