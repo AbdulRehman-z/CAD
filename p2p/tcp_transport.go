@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 )
 
 // TCPPeer represents the remote node over the tcp established connection.
 type TCPPeer struct {
 	// conn represents the underlying connection of the tcp peer
-	conn *net.TCPConn
+	net.Conn
 
 	// if we dial and our connection got accepted then, outbound === true
 	// if we accept an incoming connection then, outbound === false
@@ -19,14 +20,16 @@ type TCPPeer struct {
 // NewTCPPeer creates a new TCPPeer instance.
 func NewTCPPeer(conn *net.TCPConn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbound: outbound,
 	}
 }
 
-// Close closes the underlying connection of the TCPPeer.
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
+func (p *TCPPeer) Send(b []byte) error {
+	if _, err := p.Conn.Write(b); err != nil {
+		return fmt.Errorf("err writing to peer: %s", err)
+	}
+	return nil
 }
 
 // TCPTransportOpts represents the options for the TCPTransport.
@@ -61,8 +64,6 @@ func (t *TCPTransport) ListenAndAccept() error {
 		fmt.Printf("Failed to listen on %s: %v\n", t.ListenAddr, err)
 	}
 
-	fmt.Printf("Listening on %v\n", t.ListenAddr.AddrPort())
-
 	go t.startAcceptLoop()
 	return nil
 }
@@ -77,13 +78,15 @@ func (t *TCPTransport) Close() error {
 
 // Dial dials to the provided addr.
 func (t *TCPTransport) Dial(port int) error {
-	conn, err := net.DialTCP("tcp", t.ListenAddr, &net.TCPAddr{
+
+	fmt.Println("Dial is executed")
+
+	time.Sleep(2 * time.Second)
+	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP("localhost"),
 		Port: port,
 	},
 	)
-
-	fmt.Println("Dialing to: ", port)
 
 	if err != nil {
 		return fmt.Errorf("failed to dial: %v", err)
@@ -100,6 +103,8 @@ func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.TcpListener.AcceptTCP()
 
+		fmt.Println("Accepted connection: ", conn)
+
 		if errors.Is(err, net.ErrClosed) {
 			fmt.Println("TCPListener closed")
 			return
@@ -110,12 +115,8 @@ func (t *TCPTransport) startAcceptLoop() {
 			break
 		}
 
-		fmt.Println("Rate limit: ", rateLimit)
-
 		if err != nil {
 			rateLimit++
-			fmt.Println("connetion: ", conn)
-			fmt.Printf("Failed to accept connection: %v\n", err)
 			continue
 		}
 
@@ -133,7 +134,6 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 	}()
 
 	peer := NewTCPPeer(conn, outbound)
-
 	if err = t.Handshake(peer); err != nil {
 		fmt.Printf("Handshake failed: %v\n", err)
 		return
@@ -149,8 +149,8 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 	for {
 		if err = t.Decoder.Decode(conn, &msg); err != nil {
 			fmt.Printf("Failed to decode RPC: %v\n", err)
-			continue
 		}
+		fmt.Println("handling 1")
 
 		msg.From = conn.RemoteAddr()
 		t.rpcch <- msg
