@@ -43,12 +43,17 @@ func main() {
 	s1 := initServer(4000, []int{}...)
 	s2 := initServer(4001, 4000)
 
-	go s1.Start()
+	go func() {
+		log.Fatal(s1.Start())
+	}()
 	time.Sleep(1 * time.Second)
 	go s2.Start()
 
 	time.Sleep(1 * time.Second)
-	err := s2.StoreData("myprivatedata", bytes.NewReader([]byte("hello  daw dbwjbdjawbdjwadjwdworld")))
+
+	bytes := bytes.NewReader([]byte("hlo"))
+
+	err := s2.StoreData("myprivatedata", bytes)
 
 	if err != nil {
 		log.Fatalf("Failed to store data: %v", err)
