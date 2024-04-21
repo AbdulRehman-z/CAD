@@ -20,7 +20,7 @@ func (g *GOBDecoder) Decode(r io.Reader, msg *RPC) error {
 type DefaultDecoder struct{}
 
 func (d *DefaultDecoder) Decode(r io.Reader, msg *RPC) error {
-	buf := make([]byte, 1024)
+	buf := make([]byte, 2000)
 	n, err := r.Read(buf)
 	if err != nil {
 		return fmt.Errorf("failed to read from connection: %v", err)
