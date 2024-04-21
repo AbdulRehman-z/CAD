@@ -142,6 +142,8 @@ func (s *Store) writeSream(key string, r io.Reader) error {
 		return fmt.Errorf("err in creating file: %s", err)
 	}
 
+	defer f.Close()
+
 	_, err = io.Copy(f, r)
 	if err != nil {
 		return fmt.Errorf("err in copying number of bytes: %s", err)
