@@ -3,8 +3,8 @@ package p2p
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net"
-	"time"
 )
 
 // TCPPeer represents the remote node over the tcp established connection.
@@ -78,10 +78,6 @@ func (t *TCPTransport) Close() error {
 
 // Dial dials to the provided addr.
 func (t *TCPTransport) Dial(port int) error {
-
-	fmt.Println("Dial is executed")
-
-	time.Sleep(2 * time.Second)
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{
 		IP:   net.ParseIP("localhost"),
 		Port: port,
@@ -91,6 +87,8 @@ func (t *TCPTransport) Dial(port int) error {
 	if err != nil {
 		return fmt.Errorf("failed to dial: %v", err)
 	}
+
+	fmt.Println("Dial executed", conn.RemoteAddr().String())
 
 	go t.handleConn(conn, true)
 	return nil
@@ -102,9 +100,6 @@ func (t *TCPTransport) startAcceptLoop() {
 
 	for {
 		conn, err := t.TcpListener.AcceptTCP()
-
-		fmt.Println("Accepted connection: ", conn)
-
 		if errors.Is(err, net.ErrClosed) {
 			fmt.Println("TCPListener closed")
 			return
@@ -140,6 +135,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 	}
 
 	if t.OnPeer != nil {
+		log.Printf("Peer added: %v\n", peer)
 		if err = t.OnPeer(peer); err != nil {
 			return
 		}
@@ -148,12 +144,11 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 	msg := RPC{}
 	for {
 		if err = t.Decoder.Decode(conn, &msg); err != nil {
-			fmt.Printf("Failed to decode RPC: %v\n", err)
+			fmt.Printf("Context[t.handleConn()]: Failed to decode msg: %v\n", err)
 		}
-		fmt.Println("handling 1")
 
 		msg.From = conn.RemoteAddr()
 		t.rpcch <- msg
-		fmt.Printf("Received RPC: %v %v\n", msg.From.String(), string(msg.Payload))
+		fmt.Printf("Received %v bytes from %v\n", len(msg.Payload), msg.From)
 	}
 }
