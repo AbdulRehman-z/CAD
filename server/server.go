@@ -32,7 +32,7 @@ type FileServer struct {
 
 type Payload struct {
 	Key  string
-	data []byte
+	Data []byte
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
@@ -54,17 +54,15 @@ func (s *FileServer) Start() error {
 		return fmt.Errorf("err starting server: %s", err)
 	}
 
-	s.Bootstrap()
+	if len(s.BootstrapNodes) > 0 {
+		s.Bootstrap()
+	}
 	s.loop()
 
 	return nil
 }
 
 func (s *FileServer) Bootstrap() {
-	if len(s.BootstrapNodes) == 0 {
-		return
-	}
-
 	for _, port := range s.BootstrapNodes {
 		go func(port int) {
 			if err := s.Transport.Dial(port); err != nil {
@@ -83,13 +81,11 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 	defer s.peerLock.Unlock()
 
 	s.peers[p.RemoteAddr().String()] = p
-	log.Printf("connected with remote: %s", p.RemoteAddr().String())
 
 	return nil
 }
 
 func (s *FileServer) StoreData(key string, r io.Reader) error {
-	fmt.Println("Storing data: ", key)
 	buf := new(bytes.Buffer)
 	// io.TeeReader returns a Reader that writes to w what it reads from r.
 	tee := io.TeeReader(r, buf)
@@ -99,7 +95,7 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 
 	p := &Payload{
 		Key:  key,
-		data: buf.Bytes(),
+		Data: buf.Bytes(),
 	}
 
 	return s.broadcast(p)
@@ -117,7 +113,7 @@ func (s *FileServer) broadcast(p *Payload) error {
 
 func (s *FileServer) loop() {
 	defer func() {
-		log.Printf("Shutting down server")
+		log.Println("Shutting down server")
 		s.Transport.Close()
 	}()
 
@@ -125,11 +121,12 @@ loop:
 	for {
 		select {
 		case msg := <-s.Transport.Consume():
-			fmt.Println("consumed")
 			var p Payload
 			if err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p); err != nil {
-				log.Printf("Failed to decode payload: %v", err)
+				log.Printf("Context[s.loop()]: Failed to decode payload: %s", err)
 			}
+
+			fmt.Printf("Received payload: %v\n", string(p.Data))
 		case <-s.quitChan:
 			break loop
 		}
