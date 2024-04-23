@@ -18,7 +18,7 @@ type Transport interface {
 
 // RPC represents the RPC that is sent between peers.
 type RPC struct {
-	From net.Addr
+	From string
 	// Payload represents the actual data that is sent between peers.
 	Payload []byte
 }
