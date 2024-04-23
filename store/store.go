@@ -118,6 +118,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 }
 
 func (s *Store) Write(key string, r io.Reader) error {
+	fmt.Println("Writing key	: ", key)
 	return s.writeSream(key, r)
 }
 
@@ -142,9 +143,10 @@ func (s *Store) writeSream(key string, r io.Reader) error {
 		return fmt.Errorf("err in creating file: %s", err)
 	}
 
-	defer f.Close()
-
-	_, err = io.Copy(f, r)
+	// defer f.Close()
+	var n int64
+	n, err = io.Copy(f, r)
+	fmt.Println("Copied number of bytes: ", n)
 	if err != nil {
 		return fmt.Errorf("err in copying number of bytes: %s", err)
 	}
