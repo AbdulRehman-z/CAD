@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 )
 
 // TCPPeer represents the remote node over the tcp established connection.
@@ -15,6 +16,7 @@ type TCPPeer struct {
 	// if we dial and our connection got accepted then, outbound === true
 	// if we accept an incoming connection then, outbound === false
 	outbound bool
+	Wg       *sync.WaitGroup
 }
 
 // NewTCPPeer creates a new TCPPeer instance.
@@ -22,6 +24,7 @@ func NewTCPPeer(conn *net.TCPConn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
+		Wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -29,6 +32,7 @@ func (p *TCPPeer) Send(b []byte) error {
 	if _, err := p.Conn.Write(b); err != nil {
 		return fmt.Errorf("err writing to peer: %s", err)
 	}
+	fmt.Println("Sent", len(b), "bytes to", p.Conn.RemoteAddr().String())
 	return nil
 }
 
@@ -147,8 +151,12 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 			fmt.Printf("Context[t.handleConn()]: Failed to decode msg: %v\n", err)
 		}
 
-		msg.From = conn.RemoteAddr()
+		msg.From = conn.RemoteAddr().String()
+		peer.Wg.Add(1)
+		fmt.Println("Before sending to rpcch")
 		t.rpcch <- msg
-		fmt.Printf("Received %v bytes from %v\n", len(msg.Payload), msg.From)
+		peer.Wg.Wait()
+		fmt.Println("After sending to rpcch")
+		// fmt.Printf("Received %v bytes from %v\n", len(msg.Payload), msg.From)
 	}
 }
