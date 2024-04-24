@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/1500-bytes/CAD/p2p"
@@ -27,7 +28,7 @@ func initServer(port int, nodes ...int) *server.FileServer {
 
 	fileServerOpts := server.FileServerOpts{
 		PathTransformFunc: store.CasPathTransformFunc,
-		RootStorage:       "4000_network",
+		RootStorage:       strconv.Itoa(port) + "_network",
 		Transport:         tcpTransport,
 		BootstrapNodes:    nodes,
 	}
@@ -40,8 +41,8 @@ func initServer(port int, nodes ...int) *server.FileServer {
 
 func main() {
 
-	s1 := initServer(4000, []int{}...)
-	s2 := initServer(4001, 4000)
+	s1 := initServer(3000, []int{}...)
+	s2 := initServer(4000, 3000)
 
 	go func() {
 		log.Fatal(s1.Start())
