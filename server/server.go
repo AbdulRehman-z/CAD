@@ -92,33 +92,42 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 
 func (s *FileServer) StoreData(key string, r io.Reader) error {
 	var err error
+	fileBuffer := new(bytes.Buffer)
 
-	buf := new(bytes.Buffer)
+	// tee reader reads from r and writes to fileBuffer and return a reader
+	tee := io.TeeReader(r, fileBuffer)
+	size, err := s.store.Write(key, tee)
+	if err != nil {
+		log.Printf("err writing to store: %s\n", err)
+	}
+
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key:  key,
-			Size: 15,
+			Size: size,
 		},
 	}
 
-	if err = gob.NewEncoder(buf).Encode(&msg); err != nil {
+	msgBuf := new(bytes.Buffer)
+	if err = gob.NewEncoder(msgBuf).Encode(&msg); err != nil {
 		log.Printf("err encoding: %s\n", err)
 	}
+
 	for _, peer := range s.peers {
-		fmt.Println("Sending key")
-		if err = peer.Send(buf.Bytes()); err != nil {
+		if err = peer.Send(msgBuf.Bytes()); err != nil {
 			log.Printf("err sending key: %s\n", err)
 		}
 	}
 
 	time.Sleep(1 * time.Second)
 
-	payload := []byte("Hello, Wordawd!")
 	for _, peer := range s.peers {
-		fmt.Println("Sending payload")
-		if err = peer.Send(payload); err != nil {
-			log.Printf("err sending payload: %s\n", err)
+		n, err := io.Copy(peer, fileBuffer)
+		if err != nil {
+			log.Printf("err writing to peers: %s\n", err)
 		}
+
+		fmt.Printf("Wrote and received: %d\n & %d\n", fileBuffer.Len(), n)
 	}
 
 	return nil
@@ -177,11 +186,12 @@ func (s *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) err
 		return fmt.Errorf("peer not found: %s", from)
 	}
 
-	if err := s.store.Write(m.Key, io.LimitReader(peer, m.Size)); err != nil {
+	if _, err := s.store.Write(m.Key, io.LimitReader(peer, m.Size)); err != nil {
 		return fmt.Errorf("err writing to store: %s", err)
 	}
 
 	peer.(*p2p.TCPPeer).Wg.Done()
+	fmt.Printf("finished writing: %s\n", peer)
 	return nil
 }
 
