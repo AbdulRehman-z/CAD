@@ -117,8 +117,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return buf, nil
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
-	fmt.Println("Writing key	: ", key)
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeSream(key, r)
 }
 
@@ -128,28 +127,26 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPathWithRoot)
 }
 
-func (s *Store) writeSream(key string, r io.Reader) error {
+func (s *Store) writeSream(key string, r io.Reader) (int64, error) {
 	pathKey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
 	// create a directory
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return fmt.Errorf("err in write stream: %s", err)
+		return 0, fmt.Errorf("err in write stream: %s", err)
 	}
 
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 	// create a file
 	f, err := os.Create(fullPathWithRoot)
 	if err != nil {
-		return fmt.Errorf("err in creating file: %s", err)
+		return 0, fmt.Errorf("err in creating file: %s", err)
 	}
 
-	// defer f.Close()
-	var n int64
-	n, err = io.Copy(f, r)
-	fmt.Println("Copied number of bytes: ", n)
+	defer f.Close()
+	n, err := io.Copy(f, r)
 	if err != nil {
-		return fmt.Errorf("err in copying number of bytes: %s", err)
+		return 0, fmt.Errorf("err in copying number of bytes: %s", err)
 	}
 
-	return nil
+	return n, nil
 }
