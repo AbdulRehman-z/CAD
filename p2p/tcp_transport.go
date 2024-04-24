@@ -153,7 +153,7 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 
 		msg.From = conn.RemoteAddr().String()
 		peer.Wg.Add(1)
-		fmt.Println("Before sending to rpcch")
+		fmt.Printf("Decoded %v\n", msg)
 		t.rpcch <- msg
 		peer.Wg.Wait()
 		fmt.Println("After sending to rpcch")
