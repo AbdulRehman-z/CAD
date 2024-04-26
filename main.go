@@ -52,13 +52,26 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
-	bytes := bytes.NewReader([]byte("hlo"))
-
-	err := s2.StoreData("myprivatedata", bytes)
-
-	if err != nil {
-		log.Fatalf("Failed to store data: %v", err)
+	for i := 0; i < 10; i++ {
+		key := fmt.Sprintf("myprivatedata_%d", i)
+		data := bytes.NewReader([]byte("hello there " + key))
+		err := s2.StoreData(key, data)
+		if err != nil {
+			log.Print(err)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	select {}
+	// r, err := s2.Get("myprivatedata")
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+	// b, err := io.ReadAll(r)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+	// fmt.Println("Read the following bytes: ", string(b))
 }
