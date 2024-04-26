@@ -29,11 +29,11 @@ func TestStore(t *testing.T) {
 	defer teardown(t, s)
 
 	data := []byte("hello there")
-	if err := s.writeSream("dir", bytes.NewReader(data)); err != nil {
+	if _, err := s.writeSream("dir", bytes.NewReader(data)); err != nil {
 		t.Error(err)
 	}
 
-	r, err := s.Read("dir")
+	_, r, err := s.Read("dir")
 	if err != nil {
 		t.Error(err)
 	}
