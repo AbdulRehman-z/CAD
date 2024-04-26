@@ -6,19 +6,14 @@ import "net"
 type Peer interface {
 	net.Conn
 	Send(b []byte) error
+	CloseStream()
 }
 
 // Transport represents as an interface for a transport layer
 type Transport interface {
+	Addr() string
 	ListenAndAccept() error
 	Consume() <-chan RPC
 	Close() error
 	Dial(int) error
-}
-
-// RPC represents the RPC that is sent between peers.
-type RPC struct {
-	From string
-	// Payload represents the actual data that is sent between peers.
-	Payload []byte
 }
