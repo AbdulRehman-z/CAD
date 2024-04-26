@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"sync"
 )
@@ -16,7 +17,7 @@ type TCPPeer struct {
 	// if we dial and our connection got accepted then, outbound === true
 	// if we accept an incoming connection then, outbound === false
 	outbound bool
-	Wg       *sync.WaitGroup
+	wg       *sync.WaitGroup
 }
 
 // NewTCPPeer creates a new TCPPeer instance.
@@ -24,16 +25,21 @@ func NewTCPPeer(conn *net.TCPConn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
-		Wg:       &sync.WaitGroup{},
+		wg:       &sync.WaitGroup{},
 	}
 }
 
 func (p *TCPPeer) Send(b []byte) error {
-	if _, err := p.Conn.Write(b); err != nil {
+	n, err := p.Conn.Write(b)
+	if err != nil {
 		return fmt.Errorf("err writing to peer: %s", err)
 	}
-	fmt.Println("Sent", len(b), "bytes to", p.Conn.RemoteAddr().String())
+	fmt.Println("Write the followig data to connection: ", n)
 	return nil
+}
+
+func (p *TCPPeer) CloseStream() {
+	p.wg.Done()
 }
 
 // TCPTransportOpts represents the options for the TCPTransport.
@@ -55,7 +61,7 @@ type TCPTransport struct {
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcch:            make(chan RPC),
+		rpcch:            make(chan RPC, 1024),
 	}
 }
 
@@ -70,6 +76,10 @@ func (t *TCPTransport) ListenAndAccept() error {
 
 	go t.startAcceptLoop()
 	return nil
+}
+
+func (t *TCPTransport) Addr() string {
+	return t.ListenAddr.String()
 }
 
 func (t *TCPTransport) Consume() <-chan RPC {
@@ -145,18 +155,21 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 		}
 	}
 
-	msg := RPC{}
 	for {
-		if err = t.Decoder.Decode(conn, &msg); err != nil {
-			fmt.Printf("Context[t.handleConn()]: Failed to decode msg: %v\n", err)
+		rpc := RPC{}
+		if err = t.Decoder.Decode(conn, &rpc); err != nil {
+			fmt.Printf("Context[t.handleConn()]: Failed to decode rpc: %v\n", err)
 		}
 
-		msg.From = conn.RemoteAddr().String()
-		peer.Wg.Add(1)
-		fmt.Printf("Decoded %v\n", msg)
-		t.rpcch <- msg
-		peer.Wg.Wait()
-		fmt.Println("After sending to rpcch")
-		// fmt.Printf("Received %v bytes from %v\n", len(msg.Payload), msg.From)
+		rpc.From = conn.RemoteAddr().String()
+		if rpc.Stream {
+			peer.wg.Add(1)
+			fmt.Printf("Received stream from %v\n", rpc.From)
+			peer.wg.Wait()
+			fmt.Printf("Finished receiving stream from %v\n", rpc.From)
+			continue
+		}
+		t.rpcch <- rpc
+		slog.Info("write the following buffer to payload", "conn", rpc.From, "payload", string(rpc.Payload))
 	}
 }
