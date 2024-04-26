@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
@@ -52,26 +52,23 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
-	for i := 0; i < 10; i++ {
-		key := fmt.Sprintf("myprivatedata_%d", i)
-		data := bytes.NewReader([]byte("hello there " + key))
-		err := s2.StoreData(key, data)
-		if err != nil {
-			log.Print(err)
-		}
-		time.Sleep(10 * time.Millisecond)
+	// data := bytes.NewReader([]byte("hello there"))
+	// err := s2.StoreData("myprivatedata", data)
+	// if err != nil {
+	// 	log.Print(err)
+	// }
+	// time.Sleep(5 * time.Millisecond)
+
+	// select {}
+	r, err := s2.Get("myprivatedata")
+	if err != nil {
+		log.Println(err)
 	}
 
-	select {}
-	// r, err := s2.Get("myprivatedata")
-	// if err != nil {
-	// 	log.Println(err)
-	// }
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Println(err)
+	}
 
-	// b, err := io.ReadAll(r)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-
-	// fmt.Println("Read the following bytes: ", string(b))
+	fmt.Println("Read the following bytes: ", string(b))
 }
