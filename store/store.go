@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 )
@@ -99,7 +100,6 @@ func (s *Store) Clear() error {
 }
 
 func (s *Store) Read(key string) (io.Reader, error) {
-	fmt.Println("Reading key: ", key)
 	r, err := s.readStream(key)
 	if err != nil {
 		fmt.Println("Error in reading stream: ", err)
@@ -142,7 +142,11 @@ func (s *Store) writeSream(key string, r io.Reader) (int64, error) {
 		return 0, fmt.Errorf("err in creating file: %s", err)
 	}
 
-	defer f.Close()
+	defer func() {
+		log.Println("write finished to disc")
+		f.Close()
+	}()
+
 	n, err := io.Copy(f, r)
 	if err != nil {
 		return 0, fmt.Errorf("err in copying number of bytes: %s", err)
