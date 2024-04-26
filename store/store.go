@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -99,32 +98,28 @@ func (s *Store) Clear() error {
 	return os.RemoveAll(s.Root)
 }
 
-func (s *Store) Read(key string) (io.Reader, error) {
-	r, err := s.readStream(key)
-	if err != nil {
-		fmt.Println("Error in reading stream: ", err)
-		return nil, err
-	}
-	defer r.Close()
-
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, r)
-	if err != nil {
-		fmt.Println("Error in copying stream: ", err)
-		return nil, err
-	}
-
-	return buf, nil
+func (s *Store) Read(key string) (int64, io.Reader, error) {
+	return s.readStream(key)
 }
 
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeSream(key, r)
 }
 
-func (s *Store) readStream(key string) (io.ReadCloser, error) {
+func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	pathKey := s.PathTransformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
-	return os.Open(fullPathWithRoot)
+	file, err := os.Open(fullPathWithRoot)
+	if err != nil {
+		return 0, nil, fmt.Errorf("err opening file: %s", err.Error())
+	}
+
+	info, err := file.Stat()
+	if err != nil {
+		return 0, nil, fmt.Errorf("err getting file info: %s", err.Error())
+	}
+
+	return info.Size(), file, nil
 }
 
 func (s *Store) writeSream(key string, r io.Reader) (int64, error) {
