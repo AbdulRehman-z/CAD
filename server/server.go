@@ -145,7 +145,7 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 		fileBuffer = new(bytes.Buffer)
 	)
 
-	// tee reader reads from r and writes to fileBuffer and return a reader
+	// tee reader reads from r and writes as copy to fileBuffer and return the reader which holds the original data
 	tee := io.TeeReader(r, fileBuffer)
 	size, err := s.store.Write(key, tee)
 	if err != nil {
