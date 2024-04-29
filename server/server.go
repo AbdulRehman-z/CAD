@@ -11,11 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/1500-bytes/CAD/crypto"
 	"github.com/1500-bytes/CAD/p2p"
 	"github.com/1500-bytes/CAD/store"
 )
 
 type FileServerOpts struct {
+	EncKey            []byte
 	PathTransformFunc store.PathTransformFunc
 	RootStorage       string
 	Transport         p2p.Transport
@@ -167,9 +169,9 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 
 	for _, peer := range s.peers {
 		peer.Send([]byte{p2p.IncomingStream})
-		n, err := io.Copy(peer, fileBuffer)
+		n, err := crypto.CopyEncrypt(s.FileServerOpts.EncKey, fileBuffer, peer)
 		if err != nil {
-			log.Printf("err writing to peers: %s\n", err)
+			slog.Error("err in encryption", "err", err)
 		}
 		slog.Info("Sent the following to peer", "peer", peer.RemoteAddr().String(), "size", n)
 	}
