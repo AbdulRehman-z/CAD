@@ -4,9 +4,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/1500-bytes/CAD/crypto"
 )
 
 var defaultRootPathname = "store"
@@ -90,6 +92,7 @@ func (s *Store) Has(key string) bool {
 func (s *Store) Delete(key string) error {
 	pathKey := s.PathTransformFunc(key)
 	firstPathnameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FirstPathname())
+	slog.Info("deleted the following path", "path", firstPathnameWithRoot)
 
 	return os.RemoveAll(firstPathnameWithRoot)
 }
@@ -122,6 +125,28 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	return info.Size(), file, nil
 }
 
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	pathKey := s.PathTransformFunc(key)
+	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
+	// create a directory
+	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
+		return 0, fmt.Errorf("err in write stream: %s", err)
+	}
+
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
+	// create a file
+	f, err := os.Create(fullPathWithRoot)
+	if err != nil {
+		return 0, fmt.Errorf("err in creating file: %s", err)
+	}
+
+	n, err := crypto.CopyDecrypt(encKey, r, f)
+	if err != nil {
+		return 0, err
+	}
+	return int64(n), err
+}
+
 func (s *Store) writeSream(key string, r io.Reader) (int64, error) {
 	pathKey := s.PathTransformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
@@ -137,15 +162,11 @@ func (s *Store) writeSream(key string, r io.Reader) (int64, error) {
 		return 0, fmt.Errorf("err in creating file: %s", err)
 	}
 
-	defer func() {
-		log.Println("write finished to disc")
-		f.Close()
-	}()
-
 	n, err := io.Copy(f, r)
 	if err != nil {
 		return 0, fmt.Errorf("err in copying number of bytes: %s", err)
 	}
+	slog.Info("Copied the following number of bytes from tee reader", "bytes", n)
 
 	return n, nil
 }
