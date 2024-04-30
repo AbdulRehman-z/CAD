@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"log"
 )
 
 type Decoder interface {
@@ -26,7 +27,7 @@ func (d *DefaultDecoder) Decode(r io.Reader, msg *RPC) error {
 	}
 	stream := peekbuf[0] == IncomingStream
 	if stream {
-		fmt.Println("Stream detected")
+		log.Println("Stream detected")
 		msg.Stream = true
 		return nil
 	}
