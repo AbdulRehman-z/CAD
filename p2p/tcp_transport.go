@@ -160,7 +160,6 @@ func (t *TCPTransport) handleConn(conn *net.TCPConn, outbound bool) {
 		if err = t.Decoder.Decode(conn, &rpc); err != nil {
 			fmt.Printf("Context[t.handleConn()]: Failed to decode rpc: %v\n", err)
 		}
-
 		rpc.From = conn.RemoteAddr().String()
 		if rpc.Stream {
 			peer.wg.Add(1)
