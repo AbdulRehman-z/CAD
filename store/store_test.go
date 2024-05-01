@@ -6,6 +6,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/1500-bytes/CAD/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,11 +30,12 @@ func TestStore(t *testing.T) {
 	defer teardown(t, s)
 
 	data := []byte("hello there")
-	if _, err := s.writeSream("dir", bytes.NewReader(data)); err != nil {
+	id := crypto.NewID()
+	if _, err := s.writeSream(id, "dir", bytes.NewReader(data)); err != nil {
 		t.Error(err)
 	}
 
-	_, r, err := s.Read("dir")
+	_, r, err := s.Read(id, "dir")
 	if err != nil {
 		t.Error(err)
 	}
@@ -47,15 +49,15 @@ func TestStore(t *testing.T) {
 		t.Error("data mismatch")
 	}
 
-	if !s.Has("dir") {
+	if !s.Has(id, "dir") {
 		t.Error("dir should exist")
 	}
 
-	if err := s.Delete("dir"); err != nil {
+	if err := s.Delete(id, "dir"); err != nil {
 		t.Error(err)
 	}
 
-	if s.Has("dir") {
+	if s.Has(id, "dir") {
 		t.Error("dir should not exist")
 	}
 
