@@ -15,7 +15,7 @@ import (
 	"github.com/1500-bytes/CAD/store"
 )
 
-func initServer(port int, nodes ...int) *server.FileServer {
+func initServer(id string, port int, nodes ...int) *server.FileServer {
 	transOpts := p2p.TCPTransportOpts{
 		ListenAddr: &net.TCPAddr{
 			IP:   net.ParseIP("localhost"),
@@ -29,6 +29,7 @@ func initServer(port int, nodes ...int) *server.FileServer {
 	tcpTransport := p2p.NewTCPTransport(transOpts)
 
 	fileServerOpts := server.FileServerOpts{
+		ID:                id,
 		EncKey:            crypto.NewEncryptionKey(),
 		PathTransformFunc: store.CasPathTransformFunc,
 		RootStorage:       strconv.Itoa(port) + "_network",
@@ -43,41 +44,41 @@ func initServer(port int, nodes ...int) *server.FileServer {
 }
 
 func main() {
+	id := crypto.NewID()
 
-	s1 := initServer(3000, []int{}...)
-	s2 := initServer(4000, 3000)
+	s1 := initServer(id, 3000, []int{}...)
+	s2 := initServer(id, 4000, 3000)
+	s3 := initServer(id, 5000, 3000, 4000)
 
-	go func() {
-		log.Fatal(s1.Start())
-	}()
-	time.Sleep(1 * time.Second)
-	go s2.Start()
+	go func() { log.Fatal(s1.Start()) }()
+	time.Sleep(500 * time.Millisecond)
+	go func() { log.Fatal(s2.Start()) }()
 
-	time.Sleep(1 * time.Second)
-	// for i := 0; i < 1; i++ {
-	data := bytes.NewReader([]byte("hello there"))
-	key := "myprivatedata"
-	err := s2.StoreData(key, data)
-	if err != nil {
-		log.Print(err)
-	}
-
-	err = s2.Store.Delete(key)
-	if err != nil {
-		log.Print(err)
-	}
 	time.Sleep(2 * time.Second)
 
-	// // // select {}
-	r, err := s2.Get(key)
-	if err != nil {
-		log.Println(err)
-	}
+	go s3.Start()
+	time.Sleep(2 * time.Second)
 
-	b, err := io.ReadAll(r)
-	// time.Sleep(2 * time.Second)
-	if err == nil {
-		fmt.Println("Read the following bytes: ", string(b))
-	}
+	for i := 0; i < 3; i++ {
+		log.Printf("Unique ID: %s\n", s3.ID)
+		key := fmt.Sprintf("picture_%d.png", i)
+		data := bytes.NewReader([]byte("NO BS! Vanilla Golang at its best!"))
+		s3.StoreData(key, data)
 
+		if err := s3.Store.Delete(s3.ID, key); err != nil {
+			log.Fatal(err)
+		}
+
+		r, err := s3.Get(key)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		b, err := io.ReadAll(r)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(string(b))
+	}
 }
