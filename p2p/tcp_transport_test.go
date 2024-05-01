@@ -8,10 +8,15 @@ import (
 )
 
 func TestTCPTransport(t *testing.T) {
-	c := NewTCPTransport(&net.TCPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
-		Port: 4000,
+	tcp := NewTCPTransport(TCPTransportOpts{
+		ListenAddr: &net.TCPAddr{
+			IP:   net.ParseIP("localhost"),
+			Port: 3000,
+		},
+		Handshake: NOPEHandshake,
+		Decoder:   &DefaultDecoder{},
 	})
+	tcp.OnPeer = func(Peer) error { return nil }
 
-	require.Equal(t, "tcp", c.listenAddr.Network(), "Network should be tcp")
+	require.Equal(t, "tcp", tcp.ListenAddr.Network(), "Network should be tcp")
 }
