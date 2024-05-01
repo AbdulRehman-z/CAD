@@ -16,6 +16,7 @@ import (
 	"github.com/1500-bytes/CAD/store"
 )
 
+// FileServerOpts represents the file server options
 type FileServerOpts struct {
 	ID                string
 	EncKey            []byte
@@ -26,6 +27,7 @@ type FileServerOpts struct {
 	BootstrapNodes []int
 }
 
+// FileServer represents the file server
 type FileServer struct {
 	FileServerOpts
 
@@ -36,21 +38,31 @@ type FileServer struct {
 	quitChan chan struct{}
 }
 
+// MessageStoreFile represents the message to store the file
 type MessageStoreFile struct {
 	ID   string
 	Key  string
 	Size int64
 }
 
+// MessageGetFile represents the message to get the file
 type MessageGetFile struct {
 	ID  string
 	Key string
 }
 
+// MessageDeleteFile represents the message to delete the file
+type MessageDeleteFile struct {
+	ID  string
+	Key string
+}
+
+// Message represents the message
 type Message struct {
 	Payload any
 }
 
+// NewFileServer creates a new file server
 func NewFileServer(opts FileServerOpts) *FileServer {
 	storeOpts := store.StoreOpts{
 		Root:              opts.RootStorage,
@@ -69,6 +81,7 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 	}
 }
 
+// Start starts the server
 func (s *FileServer) Start() error {
 	if err := s.Transport.ListenAndAccept(); err != nil {
 		return fmt.Errorf("err starting server: %s", err)
@@ -82,6 +95,7 @@ func (s *FileServer) Start() error {
 	return nil
 }
 
+// Bootstrap connects to the bootstrap nodes
 func (s *FileServer) Bootstrap() {
 	for _, port := range s.BootstrapNodes {
 		go func(port int) {
@@ -92,10 +106,12 @@ func (s *FileServer) Bootstrap() {
 	}
 }
 
+// Stop stops the server
 func (s *FileServer) Stop() {
 	close(s.quitChan)
 }
 
+// OnPeer adds the peer to the map
 func (s *FileServer) OnPeer(p p2p.Peer) error {
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
@@ -105,6 +121,7 @@ func (s *FileServer) OnPeer(p p2p.Peer) error {
 	return nil
 }
 
+// Get gets the file from the store
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.Store.Has(s.ID, key) {
 		log.Println("No file found locally")
@@ -147,6 +164,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	return r, err
 }
 
+// StoreData stores the data in the store
 func (s *FileServer) StoreData(key string, r io.Reader) error {
 	var (
 		err        error
@@ -188,6 +206,31 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 	return nil
 }
 
+// ClearAll clears all the networks
+func (s *FileServer) ClearAll(key string) error {
+	msg := Message{
+		Payload: MessageDeleteFile{
+			ID:  s.ID,
+			Key: crypto.HashKey(key),
+		},
+	}
+
+	if s.Store.Has(s.ID, key) {
+		if err := s.Store.Delete(s.ID, key); err != nil {
+			return fmt.Errorf("err deleting file: %s", err)
+		}
+	}
+
+	if err := s.broadcast(&msg); err != nil {
+		return err
+	}
+
+	time.Sleep(1 * time.Second)
+
+	return nil
+}
+
+// broadcast sends the message to all the peers
 func (s *FileServer) broadcast(msg *Message) error {
 	buf := new(bytes.Buffer)
 	if err := gob.NewEncoder(buf).Encode(msg); err != nil {
@@ -204,6 +247,7 @@ func (s *FileServer) broadcast(msg *Message) error {
 	return nil
 }
 
+// loop listens for incoming messages
 func (s *FileServer) loop() {
 	defer func() {
 		log.Println("Shutting down server")
@@ -228,16 +272,20 @@ loop:
 	}
 }
 
+// handleMessage handles the incoming messages
 func (s *FileServer) handleMessage(from string, m *Message) error {
 	switch v := m.Payload.(type) {
 	case MessageStoreFile:
 		return s.handleMessageStoreFile(from, v)
 	case MessageGetFile:
 		return s.handleMessageGetFile(from, v)
+	case MessageDeleteFile:
+		s.handleMessageDeleteFile(from, v)
 	}
 	return nil
 }
 
+// handleMessageStoreFile handles the message store file
 func (s *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) error {
 	peer, ok := s.peers[from]
 	if !ok {
@@ -290,7 +338,25 @@ func (s *FileServer) handleMessageGetFile(from string, m MessageGetFile) error {
 	return nil
 }
 
+// handleMessageDeleteFile handles the message delete file
+func (s *FileServer) handleMessageDeleteFile(from string, m MessageDeleteFile) error {
+	peer, ok := s.peers[from]
+	if !ok {
+		return fmt.Errorf("peer not found: %s", from)
+	}
+
+	peer.Send([]byte{p2p.IncomingMessage})
+	if err := s.Store.Delete(m.ID, m.Key); err != nil {
+		return fmt.Errorf("err deleting file: %s", err)
+	}
+
+	slog.Info("File deleted", "key", m.Key, "from", from)
+	return nil
+
+}
+
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
+	gob.Register(MessageDeleteFile{})
 }

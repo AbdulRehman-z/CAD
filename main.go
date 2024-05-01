@@ -59,7 +59,7 @@ func main() {
 	go s3.Start()
 	time.Sleep(2 * time.Second)
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 1; i++ {
 		log.Printf("Unique ID: %s\n", s3.ID)
 		key := fmt.Sprintf("picture_%d.png", i)
 		data := bytes.NewReader([]byte("NO BS! Vanilla Golang at its best!"))
@@ -80,5 +80,12 @@ func main() {
 		}
 
 		fmt.Println(string(b))
+
+		if err := s3.ClearAll(key); err != nil {
+			panic(err)
+		}
 	}
+
+	// delete all the data
+
 }
